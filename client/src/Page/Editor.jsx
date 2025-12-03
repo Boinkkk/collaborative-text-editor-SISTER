@@ -1,97 +1,99 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
 import { QuillBinding } from 'y-quill';
 import Quill from 'quill';
+import io from 'socket.io-client';
 import 'quill/dist/quill.snow.css';
+
+// ID Dokumen statis untuk tes (nanti bisa dinamis dari URL)
+const DOCUMENT_ID = "skripsi-bab-1"; 
 
 const Editor = () => {
   const editorRef = useRef(null);
-  // Default status 'connecting' agar indikator kuning muncul di awal
-  const [connectionStatus, setConnectionStatus] = useState('connecting'); 
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
 
   useEffect(() => {
     const ydoc = new Y.Doc();
     
-    // Ganti URL ini nanti saat sudah menjalankan server Nginx+Node
-    // Untuk saat ini biarkan localhost:80 (atau ws://localhost:3000 jika test langsung ke node)
-    const provider = new WebsocketProvider(
-      'ws://localhost:80', 
-      'collaborative-document-room', 
-      ydoc
-    );
-
-    provider.on('status', event => {
-      setConnectionStatus(event.status);
+    // 1. Koneksi ke Load Balancer (Port 80) atau Server langsung (Port 3000)
+    // Gunakan 'http://localhost:3000' jika menjalankan tanpa Docker dulu
+    // Gunakan 'http://localhost:80' jika sudah pakai Docker Compose
+    const socket = io('http://localhost:80', {
+      transports: ['websocket'], // Paksa pakai websocket agar cepat
+      path: '/socket.io' // Sesuaikan dengan path di server
     });
 
-    // Konfigurasi Toolbar Quill yang lebih bersih
+    // --- SETUP SOCKET EVENT ---
+    
+    socket.on('connect', () => {
+      setConnectionStatus('connected');
+      // Minta masuk room dokumen
+      socket.emit('join-document', DOCUMENT_ID);
+    });
+
+    socket.on('disconnect', () => setConnectionStatus('disconnected'));
+
+    // A. Menerima data awal dari DB
+    socket.on('load-document', (data) => {
+      // Apply update dari DB ke Yjs
+      const uint8Array = new Uint8Array(data);
+      Y.applyUpdate(ydoc, uint8Array);
+    });
+
+    // B. Menerima update dari user lain (via Server/Redis)
+    socket.on('sync-update', (update) => {
+      const uint8Array = new Uint8Array(update);
+      Y.applyUpdate(ydoc, uint8Array);
+    });
+
+    // C. Mengirim update kita ke Server
+    ydoc.on('update', (update) => {
+      socket.emit('sync-update', {
+        docId: DOCUMENT_ID,
+        update: update // Kirim binary blob
+      });
+    });
+
+    // --- SETUP EDITOR QUILL ---
     const editor = new Quill(editorRef.current, {
       modules: {
         toolbar: [
           [{ header: [1, 2, false] }],
-          ['bold', 'italic', 'underline', 'strike'], // Menambahkan strike
-          [{ color: [] }, { background: [] }], // Menambahkan warna
+          ['bold', 'italic', 'underline', 'strike'],
           [{ list: 'ordered' }, { list: 'bullet' }],
-          ['link', 'blockquote', 'code-block'], // Menambahkan link & quote
-          ['clean'] // Tombol hapus format
+          ['clean']
         ]
       },
-      placeholder: 'Ketik sesuatu yang menakjubkan di sini...',
+      placeholder: 'Ketik sesuatu...',
       theme: 'snow'
     });
 
-    const binding = new QuillBinding(ydoc.getText('quill'), editor, provider.awareness);
+    const binding = new QuillBinding(ydoc.getText('quill'), editor);
 
     return () => {
-      provider.destroy();
+      socket.disconnect();
       binding.destroy();
     };
   }, []);
 
-  // Helper untuk menentukan warna status
+  // --- UI HELPER ---
   const getStatusColor = () => {
     if (connectionStatus === 'connected') return 'bg-green-500';
-    if (connectionStatus === 'connecting') return 'bg-yellow-500';
     return 'bg-red-500';
   };
 
-  const getStatusText = () => {
-     if (connectionStatus === 'connected') return 'Online & Synced';
-     if (connectionStatus === 'connecting') return 'Connecting...';
-     return 'Offline';
-  }
-
   return (
-    <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
-      
-      {/* Editor Header Bar */}
+    <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
       <div className="bg-white px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-        <div>
-           <input 
-             type="text" 
-             defaultValue="Untitled Document" 
-             className="text-lg font-semibold text-slate-800 border-none focus:ring-0 p-0 bg-transparent placeholder-slate-400 w-full max-w-md"
-             placeholder="Document Title"
-           />
-        </div>
-        
-        {/* Modern Status Indicator */}
+        <h2 className="text-lg font-semibold text-slate-800">Skripsi Bab 1</h2>
         <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-full">
-          <span className="relative flex h-2.5 w-2.5">
-            {connectionStatus !== 'disconnected' && (
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${getStatusColor()}`}></span>
-            )}
-            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${getStatusColor()}`}></span>
-          </span>
-          <span className={`text-xs font-medium ${connectionStatus === 'connected' ? 'text-slate-600' : 'text-slate-500'}`}>
-            {getStatusText()}
+          <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${getStatusColor()}`}></span>
+          <span className="text-xs font-medium text-slate-500">
+            {connectionStatus === 'connected' ? 'Online' : 'Offline'}
           </span>
         </div>
       </div>
-      
-      {/* Area Quill Editor */}
-      <div className="bg-slate-50"> {/* Wrapper untuk memberi background abu tipis di belakang editor */}
+      <div className="bg-slate-50">
           <div ref={editorRef} className="bg-white mx-auto" /> 
       </div>
     </div>

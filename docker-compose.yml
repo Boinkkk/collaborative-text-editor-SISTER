@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # --- 1. LOAD BALANCER (NGINX) ---
+  # Ini adalah "Pintu Depan" aplikasi.
+  # User mengakses http://localhost:80, lalu Nginx melempar ke Node 1 atau 2.
+  nginx_lb:
+    image: nginx:alpine
+    container_name: nginx_lb
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app_node_1
+      - app_node_2
+    networks:
+      - app-network
+
+  # --- 2. APP SERVER 1 (NODE.JS) ---
+  app_node_1:
+    build: ./server  # Docker akan membaca Dockerfile di folder server
+    container_name: app_node_1
+    restart: always
+    environment:
+      - PORT=3000
+      - SERVER_ID=NODE_01
+      - REDIS_HOST=redis_pubsub
+      # PENTING: Hostname DB adalah nama service 'postgres_db', bukan localhost
+      - DATABASE_URL=postgresql://postgres:password@postgres_db:5432/postgres?schema=public
+    depends_on:
+      - redis_pubsub
+      - postgres_db
+    networks:
+      - app-network
+
+  # --- 3. APP SERVER 2 (NODE.JS) ---
+  app_node_2:
+    build: ./server
+    container_name: app_node_2
+    restart: always
+    environment:
+      - PORT=3000
+      - SERVER_ID=NODE_02
+      - REDIS_HOST=redis_pubsub
+      - DATABASE_URL=postgresql://postgres:password@postgres_db:5432/postgres?schema=public
+    depends_on:
+      - redis_pubsub
+      - postgres_db
+    networks:
+      - app-network
+
+  # --- 4. MESSAGE BROKER (REDIS) ---
+  # Jembatan komunikasi antar server Node 1 dan Node 2
+  redis_pubsub:
+    image: redis:alpine
+    container_name: redis_pubsub
+    restart: always
+    networks:
+      - app-network
+
+  # --- 5. DATABASE (POSTGRESQL) ---
+  postgres_db:
+    image: postgres:13
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    # Kita buka port 5433 ke Windows agar tidak bentrok dengan DB lokal Anda
+    # Tapi di dalam jaringan Docker, dia tetap pakai port 5432.
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+# --- NETWORK & VOLUME ---
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
