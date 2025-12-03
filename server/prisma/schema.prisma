@@ -1,0 +1,17 @@
+// server/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  title     String   @default("Untitled Document")
+  content   Bytes    // Menyimpan binary Yjs
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
