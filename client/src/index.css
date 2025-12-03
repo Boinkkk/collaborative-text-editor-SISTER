@@ -61,3 +61,30 @@ body {
     color: #94a3b8 !important; /* slate-400 */
     font-style: normal !important;
 }
+
+/* Styling Kursor Kolaborator */
+.ql-cursor {
+  position: relative;
+}
+
+.ql-cursor-caret {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+}
+
+.ql-cursor-flag {
+  position: absolute;
+  top: -100%; 
+  left: 0;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transform: translateY(-4px); 
+}

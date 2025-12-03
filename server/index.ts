@@ -17,11 +17,14 @@ const REDIS_HOST = process.env.REDIS_HOST || "localhost";
 interface ServerToClientEvents {
   "load-document": (data: Buffer) => void;
   "sync-update": (update: Uint8Array) => void;
+  "awareness-update": (data: { docId: string; update: Uint8Array }) => void;
+  "new-user-connected": () => void;
 }
 
 interface ClientToServerEvents {
   "join-document": (docId: string) => void;
   "sync-update": (data: { docId: string; update: Uint8Array }) => void;
+  "awareness-update": (data: { docId: string; update: Uint8Array }) => void;
 }
 
 const app = express();
@@ -48,6 +51,9 @@ async function startServer() {
 
     socket.on("join-document", async (docId) => {
       socket.join(docId);
+      console.log(`User ${socket.id} joined room ${docId}`);
+      
+      socket.to(docId).emit("new-user-connected");
       
       // Ambil data dari DB
       const doc = await prisma.document.findUnique({ where: { id: docId } });
@@ -70,6 +76,11 @@ async function startServer() {
 
       // 2. Merge & Simpan ke DB (Persistence)
       await saveToDatabase(docId, update);
+    });
+    
+    socket.on("awareness-update", ({ docId, update }) => {
+      // Broadcast ke user lain, TAPI jangan simpan ke DB
+      socket.to(docId).emit("awareness-update", { docId, update });
     });
   });
 
