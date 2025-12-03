@@ -1,0 +1,63 @@
+@import "tailwindcss";
+  
+/* Modern Light Theme Background */
+body {
+  @apply bg-slate-50 text-slate-800 font-sans;
+}
+
+/* --- QUILL EDITOR MODERN OVERRIDES --- */
+
+/* Hapus border default Quill yang tebal */
+.ql-toolbar.ql-snow,
+.ql-container.ql-snow {
+  border: none !important;
+}
+
+/* Styling Toolbar agar flat dan modern 
+   FIX: Menggunakan prefix '!' pada class tailwind (misal: !bg-white) 
+   alih-alih menaruh !important di akhir baris. 
+*/
+.ql-toolbar.ql-snow {
+  @apply !bg-white !border-b !border-slate-100 !rounded-t-2xl !px-4 !py-3;
+  font-family: inherit !important;
+}
+
+/* Styling area mengetik */
+.ql-container.ql-snow {
+  @apply !bg-white !rounded-b-2xl;
+  font-family: inherit !important;
+  font-size: 1rem !important;
+}
+
+/* Padding di dalam area editor */
+.ql-editor {
+  @apply p-6 min-h-[500px] text-slate-700 leading-relaxed;
+}
+
+/* Warna ikon toolbar saat hover/aktif */
+.ql-snow .ql-stroke {
+  stroke: #64748b !important; /* slate-500 */
+}
+.ql-snow .ql-fill {
+  fill: #64748b !important;
+}
+.ql-snow .ql-picker {
+  color: #64748b !important;
+}
+
+/* Hover state pada tombol toolbar */
+.ql-snow button:hover .ql-stroke,
+.ql-snow .ql-picker-label:hover .ql-stroke,
+.ql-snow button.ql-active .ql-stroke {
+  stroke: #4f46e5 !important; /* indigo-600 */
+}
+.ql-snow button:hover .ql-fill,
+.ql-snow button.ql-active .ql-fill {
+  fill: #4f46e5 !important;
+}
+
+/* Placeholder text color */
+.ql-editor.ql-blank::before {
+    color: #94a3b8 !important; /* slate-400 */
+    font-style: normal !important;
+}
