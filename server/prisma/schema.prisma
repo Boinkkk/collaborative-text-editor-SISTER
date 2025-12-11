@@ -7,10 +7,27 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String
+  name      String
+  color     String
+  createdAt DateTime   @default(now())
+
+
+  // Relasi: Satu user punya banyak dokumen
+  documents Document[] 
+}
+
 model Document {
   id        String   @id @default(uuid())
   title     String   @default("Untitled Document")
   content   Bytes
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relasi: Dokumen ini milik siapa?
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id])
 }
